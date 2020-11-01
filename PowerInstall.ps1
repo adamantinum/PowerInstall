@@ -26,16 +26,42 @@ Write-Host "`t PowerInstall  Copyright  (C)  2020  Alessandro Piras `n
 
 $ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
 
-$Choise = Read-Host "Please select an option
+function Show-Menu {
+    $Choise = Read-Host "Please select an option `n p.  Disk Partitioning `n c.  Show License `n q.  Quit"
 
-c.  Show License
-q.  Quit"
-
-if ($Choise -eq "c") {
-    Get-Content -Path $ScriptDir/COPYING | Out-Host -Paging
-} elseif ($Choise -eq "q") {
-    Write-Host "Goodbye"
-    exit
+    Switch ($Choise)
+    {
+        "c" {
+            Get-Content -Path $ScriptDir/COPYING | Out-Host -Paging
+        }
+	"p" {
+	    Write-Host "`n Insert sudo password"
+            Initialize-Disk
+	}
+        "q" {
+            Write-Host "`n Goodbye `n"
+	    exit
+        }
+    }
 }
 
-echo ciao
+function Initialize-Disk {
+    Write-Host "Available disks: `n"
+    lsblk -o NAME
+    $SystemDisk = Read-Host "Please select a disk to install Arch Linux"
+
+    $Alert = Read-Host "`n ATTENTION! The disk /dev/$SystemDisk will be erased! Continue? [Y/n]"
+
+    if ($Alert -ne "Y") 
+    {
+        exit
+    }
+    Write-Host "Creating GUID Partition Table..."
+    parted /dev/$SystemDisk mklabel gpt
+    Write-Host "Creating EFI partition..."
+    parted /dev/$SystemDisk mkpart EFI fat32 1 250
+    Write-Host "Creating System partition..."
+    parted "/dev/$SystemDisk mkpart Arch` Linux ext4 250 -1s"
+}
+
+Show-Menu
