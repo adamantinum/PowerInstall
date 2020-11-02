@@ -27,18 +27,17 @@ Write-Host "`t PowerInstall  Copyright  (C)  2020  Alessandro Piras `n
 $global:ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
 
 function Show-Menu {
-    $Choise = Read-Host "Installazion steps: `n p.  Disk Partitioning `n i.  Installation `n c.  Show License `n q.  Quit `n
+    $Choise = Read-Host "Installazion steps: `n s.  Disk partitioning and start installation `n c.  Show License `n q.  Quit `n
     Please select an option"
 
     Switch ($Choise)
     {
         "c" {
             Get-Content -Path $ScriptDir/COPYING | Out-Host -Paging
+	    Show-Menu
         }
-	"p" {
+	"s" {
             Initialize-Disk
-	}
-	"i" {
 	    Start-Installation
 	}
         "q" {
@@ -64,40 +63,75 @@ function Initialize-Disk {
     Write-Host "Creating EFI partition..."
     parted /dev/$SystemDisk mkpart EFI fat32 1 250
     Write-Host "Creating System partition..."
-    parted /dev/$SystemDisk mkpart Arch` Linux ext4 250 100%		# In future dynamic selection will be implemented
+    parted /dev/$SystemDisk mkpart ArchLinux ext4 250 100%		# In future dynamic selection will be implemented
 }
 
 function Start-Installation {
 
-	# Checking if arch-install-scripts are installed
-	$Check = pacman -Q | Select-String arch`-install`-scripts
-	if (-not $Check) {
-	    pacman -Syu arch`-install`-scripts
+    # Checking if arch-install-scripts are installed
+    $Check = pacman -Q | Select-String arch`-install`-scripts
+    if (-not $Check) {
+        pacman -Syu arch`-install`-scripts
+    }
+	
+    # Umounting /mnt
+    umount -R /mnt
+
+    # Mountpoint creation
+    New-Item -Path /mnt/system -ItemType Directory
+
+    # Mounting system partition
+    mount /dev/$SystemDisk`2 /mnt/system
+
+    # Mounting EFI partition
+    New-Item -Path /mnt/system/boot -ItemType Directory
+    mount /dev/$SystemDisk`1 /mnt/system/boot
+
+    # System bootstrapping
+    pacstrap /mnt/system base linux linux`-firmware base`-devel gnome gnome`-extra
+
+    # Writing configuration files
+    genfstab -U /mnt/system | Out-File -Append /mnt/system/etc/fstab
+	
+    Copy-Item /etc/resolv.conf -Destination /mnt/system/etc
+
+    # $Passwd = Read-Host -AsSecureString "Enter administrator password"
+    # $PlainPasswd = $Passwd | ConvertFrom-SecureString -AsPlain          	# Not secure at all, I'll fix it.
+    # $CreateUser = perl -e 'print crypt($PlainPasswd, "password")'
+    Write-Host "Choose Administrator password"
+    arch-chroot /mnt/system /bin/bash -c "passwd"
+
+    $Username = Read-Host "Choose Username"
+    arch-chroot /mnt/system /bin/bash -c "useradd -m $Username"
+
+    Write-Host "Choose User password"
+    arch-chroot /mnt/system /bin/bash -c "passwd $Username"
+
+    Write-Host "Enabling Services..."
+    arch-chroot /mnt/system /bin/bash -c "systemctl enable NetworkManager; systemctl enable bluetooth; systemctl enable gdm"
+
+    Write-Host "Installing bootloader..."
+    arch-chroot /mnt/system /bin/bash -c "bootctl install"
+
+    Write-Host "Cleaning..."
+    umount -R /mnt/system
+    Remove-Item -Path /mnt/system
+
+    Write-host "Installation complete."
+    $Choise = Read-Host "Press r to reboot, m to return to main menu"
+    switch ($Choise)
+    {
+        "r" {
+	    Write-Host "Reboot in 5 seconds"
+	    Wait-Event -Timeout 5
+	    
+	    Write-Host "`n Thank you for using my script! `n"
+	    systemctl reboot
 	}
-	
-	# Umounting /mnt
-	umount -R /mnt
-
-	# Mountpoint creation
-	New-Item -Path /mnt/system -ItemType Directory
-
-	# Mounting system partition
-	mount /dev/$SystemDisk`2 /mnt/system
-
-	# Mounting EFI partition
-	New-Item -Path /mnt/system/boot -ItemType Directory
-	mount /dev/$SystemDisk`1 /mnt/system/boot
-
-	# System bootstrapping
-	pacstrap /mnt/system base base`-devel linux linux`-firmware gnome gnome`-extra
-
-        # Writing configuration files
-	genfstab -U /mnt/system | Out-File -Append /mnt/system/etc/fstab
-	
-	Copy-Item /etc/resolv.conf -Destination /mnt/system/etc
-
-	$passwd = Read-Host -AsSecureString "Enter administrator password"
-	arch-chroot /mnt/system /bin/bash "passwd <<
+	"m" {
+	    Show-Menu
+	}
+    }
 }
 
 Show-Menu
