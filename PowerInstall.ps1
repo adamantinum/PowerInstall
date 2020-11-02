@@ -60,10 +60,20 @@ function Initialize-Disk {
     }
     Write-Host "Creating GUID Partition Table..."
     parted /dev/$SystemDisk mklabel gpt
+
+    # Edit for NVME
+    if ($global:SystemDisk | Select-String nvme) {
+        $global:SystemDisk = $global:SystemDisk+"p"
+    }
+
     Write-Host "Creating EFI partition..."
-    parted /dev/$SystemDisk mkpart EFI fat32 1 250
+    parted /dev/$global:SystemDisk mkpart EFI fat32 1 250
     Write-Host "Creating System partition..."
-    parted /dev/$SystemDisk mkpart ArchLinux ext4 250 100%		# In future dynamic selection will be implemented
+    parted /dev/$global:SystemDisk mkpart ArchLinux ext4 250 100%		# In future dynamic selection will be implemented
+
+    Write-Host "Formatting partitions..."
+    mkfs.vfat -F32 /dev/$global:SystemDisk`1
+    mkfs.ext4 /dev/$global:SystemDisk`2
 }
 
 function Start-Installation {
@@ -81,11 +91,11 @@ function Start-Installation {
     New-Item -Path /mnt/system -ItemType Directory
 
     # Mounting system partition
-    mount /dev/$SystemDisk`2 /mnt/system
+    mount /dev/$global:SystemDisk`2 /mnt/system
 
     # Mounting EFI partition
     New-Item -Path /mnt/system/boot -ItemType Directory
-    mount /dev/$SystemDisk`1 /mnt/system/boot
+    mount /dev/$global:SystemDisk`1 /mnt/system/boot
 
     # System bootstrapping
     pacstrap /mnt/system base linux linux`-firmware base`-devel gnome gnome`-extra
@@ -95,9 +105,6 @@ function Start-Installation {
 	
     Copy-Item /etc/resolv.conf -Destination /mnt/system/etc
 
-    # $Passwd = Read-Host -AsSecureString "Enter administrator password"
-    # $PlainPasswd = $Passwd | ConvertFrom-SecureString -AsPlain          	# Not secure at all, I'll fix it.
-    # $CreateUser = perl -e 'print crypt($PlainPasswd, "password")'
     Write-Host "Choose Administrator password"
     arch-chroot /mnt/system /bin/bash -c "passwd"
 
@@ -112,6 +119,16 @@ function Start-Installation {
 
     Write-Host "Installing bootloader..."
     arch-chroot /mnt/system /bin/bash -c "bootctl install"
+    
+    Out-File -Path /mnt/system/boot/loader/loader.conf -InputObject 'default   arch.conf
+timeout   5
+console-mode max
+editor    yes'
+
+    Out-File -Path /mnt/system/boot/loader/entries/arch.conf -InputObject 'title   Arch Linux
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options root="LABEL=ArchLinux" rw'
 
     Write-Host "Cleaning..."
     umount -R /mnt/system
