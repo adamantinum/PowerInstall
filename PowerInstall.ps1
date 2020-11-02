@@ -24,10 +24,11 @@ Write-Host "`t PowerInstall  Copyright  (C)  2020  Alessandro Piras `n
 `t under certain conditions.
 `t Read COPYING file for details about GNU Public License v3 `n"
 
-$ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
+$global:ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
 
 function Show-Menu {
-    $Choise = Read-Host "Please select an option `n p.  Disk Partitioning `n c.  Show License `n q.  Quit"
+    $Choise = Read-Host "Installazion steps: `n p.  Disk Partitioning `n i.  Installation `n c.  Show License `n q.  Quit `n
+    Please select an option"
 
     Switch ($Choise)
     {
@@ -35,8 +36,10 @@ function Show-Menu {
             Get-Content -Path $ScriptDir/COPYING | Out-Host -Paging
         }
 	"p" {
-	    Write-Host "`n Insert sudo password"
             Initialize-Disk
+	}
+	"i" {
+	    Start-Installation
 	}
         "q" {
             Write-Host "`n Goodbye `n"
@@ -48,7 +51,7 @@ function Show-Menu {
 function Initialize-Disk {
     Write-Host "Available disks: `n"
     lsblk -o NAME
-    $SystemDisk = Read-Host "Please select a disk to install Arch Linux"
+    $global:SystemDisk = Read-Host "Please select a disk to install Arch Linux"
 
     $Alert = Read-Host "`n ATTENTION! The disk /dev/$SystemDisk will be erased! Continue? [Y/n]"
 
@@ -61,7 +64,40 @@ function Initialize-Disk {
     Write-Host "Creating EFI partition..."
     parted /dev/$SystemDisk mkpart EFI fat32 1 250
     Write-Host "Creating System partition..."
-    parted "/dev/$SystemDisk mkpart Arch` Linux ext4 250 -1s"
+    parted /dev/$SystemDisk mkpart Arch` Linux ext4 250 100%		# In future dynamic selection will be implemented
+}
+
+function Start-Installation {
+
+	# Checking if arch-install-scripts are installed
+	$Check = pacman -Q | Select-String arch`-install`-scripts
+	if (-not $Check) {
+	    pacman -Syu arch`-install`-scripts
+	}
+	
+	# Umounting /mnt
+	umount -R /mnt
+
+	# Mountpoint creation
+	New-Item -Path /mnt/system -ItemType Directory
+
+	# Mounting system partition
+	mount /dev/$SystemDisk`2 /mnt/system
+
+	# Mounting EFI partition
+	New-Item -Path /mnt/system/boot -ItemType Directory
+	mount /dev/$SystemDisk`1 /mnt/system/boot
+
+	# System bootstrapping
+	pacstrap /mnt/system base base`-devel linux linux`-firmware gnome gnome`-extra
+
+        # Writing configuration files
+	genfstab -U /mnt/system | Out-File -Append /mnt/system/etc/fstab
+	
+	Copy-Item /etc/resolv.conf -Destination /mnt/system/etc
+
+	$passwd = Read-Host -AsSecureString "Enter administrator password"
+	arch-chroot /mnt/system /bin/bash "passwd <<
 }
 
 Show-Menu
