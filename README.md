@@ -17,4 +17,4 @@
 
 A simple Arch Linux install script I've written to appoach PowerShell - and in general shell scripting - then so much can be improved. 
 It's intended as a _divertissement_, because of it customization is extremely limited. Maybe in future I'll go back to that, expanding capabilities.
-At the moment the script is able to install Arch Linux with GNOME as Desktop Environment on the entire disk and in UEFI mode, without any other customization.
+At the moment the script is able to install Arch Linux with GNOME as Desktop Environment on the entire disk and in UEFI mode, without any further customization.
