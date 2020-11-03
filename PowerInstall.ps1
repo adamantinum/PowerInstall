@@ -130,15 +130,17 @@ function Start-Installation {
     Write-Host "Installing bootloader..."
     arch-chroot /mnt/system /bin/bash -c "bootctl install"
     
-    Out-File -Path /mnt/system/boot/loader/loader.conf -InputObject 'default   arch.conf
+    Out-File -Path /mnt/system/boot/loader/loader.conf -InputObject "default   arch.conf
 timeout   5
 console-mode max
-editor    yes'
+editor    yes"
 
-    Out-File -Path /mnt/system/boot/loader/entries/arch.conf -InputObject 'title   Arch Linux
+    $UUID = lsblk /dev/$global:SystemDisk`2 -o UUID
+    $UUID = $UUID[1]
+    Out-File -Path /mnt/system/boot/loader/entries/arch.conf -InputObject "title   Arch Linux
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root="LABEL=ArchLinux" rw'
+options root=`"UUID=$UUID`" rw"
 
     Write-Host "Cleaning..."
     umount -R /mnt/system
