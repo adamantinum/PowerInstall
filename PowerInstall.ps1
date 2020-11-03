@@ -77,6 +77,7 @@ function Initialize-Disk {
 
     Write-Host "Creating EFI partition..."
     parted /dev/$global:SystemDisk mkpart EFI fat32 1 250
+    parted /dev/$global:SystemDisk set 1 esp on
     Write-Host "Creating System partition..."
     parted /dev/$global:SystemDisk mkpart ArchLinux ext4 250 100%		# In future dynamic selection will be implemented
 
