@@ -54,7 +54,7 @@ function Initialize-Disk {
     }
     $Check = pacman -Q | Select-String dosfstools
     if (-not $Check) {
-        pacman -Syu doosfstools
+        pacman -Syu dosfstools
     }
     Write-Host "Available disks: `n"
     lsblk -o NAME
