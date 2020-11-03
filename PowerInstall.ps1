@@ -48,6 +48,14 @@ function Show-Menu {
 }
 
 function Initialize-Disk {
+    $Check = pacman -Q | Select-String parted
+    if (-not $Check) {
+        pacman -Syu parted
+    }
+    $Check = pacman -Q | Select-String dosfstools
+    if (-not $Check) {
+        pacman -Syu doosfstools
+    }
     Write-Host "Available disks: `n"
     lsblk -o NAME
     $global:SystemDisk = Read-Host "Please select a disk to install Arch Linux"
@@ -58,6 +66,7 @@ function Initialize-Disk {
     {
         exit
     }
+
     Write-Host "Creating GUID Partition Table..."
     parted /dev/$SystemDisk mklabel gpt
 
